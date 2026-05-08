@@ -38,7 +38,9 @@ function showToast(message, type = 'info') {
 }
 
 function generateToken() {
-    return crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+    return 'xxxxxxxxxxxx'.replace(/x/g, () =>
+        Math.floor(Math.random() * 16).toString(16)
+    );
 }
 
 function getPublicUrl(fileName) {
