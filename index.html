@@ -3,76 +3,65 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PixeImg — Фотохостинг на 7 дней</title>
-
-  <!-- Локальные стили -->
+  <title>PixeImg — Приватный фотохостинг</title>
   <link rel="stylesheet" href="style.css">
-
-  <!-- Supabase JS SDK v2 через CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<!-- ===== ШАПКА С ГРАДИЕНТОМ ===== -->
-<header class="header">
-  <h1 class="header__title">🖼️ PixeImg</h1>
-  <p class="header__subtitle">Загружайте снимки — они исчезнут ровно через 7 дней</p>
-</header>
-
-<!-- ===== ОСНОВНОЙ КОНТЕЙНЕР ===== -->
-<main class="main">
-  <!-- Зона загрузки -->
-  <section class="upload-zone" id="uploadZone" aria-label="Загрузка изображений">
-    <div class="upload-zone__icon">☁️</div>
-    <h2 class="upload-zone__title">Перетащите файлы сюда</h2>
-    <p class="upload-zone__hint">PNG, JPG, GIF, WebP до 10 МБ</p>
-    <p class="upload-zone__hint upload-zone__hint--click">или кликните для выбора</p>
-    <input
-            type="file"
-            id="fileInput"
-            class="upload-zone__input"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            multiple
-            hidden
-    >
+<main class="main" id="mainApp">
+  <section class="upload-screen" id="uploadScreen">
+    <div class="upload-center">
+      <div class="logo">
+        <span class="logo__icon">🔒</span>
+        <h1 class="logo__title">PixeImg</h1>
+        <p class="logo__subtitle">Приватный фотохостинг</p>
+      </div>
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-zone__icon">📸</div>
+        <h2 class="upload-zone__title">Загрузите фото</h2>
+        <p class="upload-zone__hint">PNG, JPG, GIF, WebP до 10 МБ</p>
+        <p class="upload-zone__hint upload-zone__hint--small">Можно несколько файлов. Перетащите или кликните.</p>
+        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
+      </div>
+      <div class="progress" id="progressContainer">
+        <div class="progress__header">
+          <span class="progress__filename" id="progressFileName">Загрузка...</span>
+          <span class="progress__percent" id="progressPercent">0%</span>
+        </div>
+        <div class="progress__track">
+          <div class="progress__fill" id="progressFill"></div>
+        </div>
+      </div>
+      <div class="result" id="resultBlock">
+        <p class="result__label">✅ Альбом загружен!</p>
+        <div class="result__link-row">
+          <input type="text" class="result__input" id="resultLink" readonly>
+          <button class="btn btn--copy-result" id="copyResultBtn">📋</button>
+        </div>
+        <p class="result__count" id="resultCount"></p>
+        <div class="result__actions">
+          <button class="btn btn--primary" id="openAlbumBtn">🖼️ Открыть альбом</button>
+          <button class="btn btn--new" id="newUploadBtn">Загрузить ещё</button>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <!-- Прогресс-бар загрузки -->
-  <div class="progress" id="progressContainer" role="progressbar" aria-hidden="true">
-    <div class="progress__header">
-      <span class="progress__filename" id="progressFileName">Загрузка...</span>
-      <span class="progress__percent" id="progressPercent">0%</span>
-    </div>
-    <div class="progress__track">
-      <div class="progress__fill" id="progressFill"></div>
-    </div>
-  </div>
-
-  <!-- Галерея изображений -->
-  <section class="gallery" id="gallery" aria-label="Галерея изображений">
-    <!-- Карточки генерируются динамически -->
+  <section class="view-screen" id="viewScreen">
+    <div class="view-center" id="viewContent"></div>
   </section>
 
-  <!-- Пустое состояние -->
-  <div class="empty-state" id="emptyState">
-    <div class="empty-state__icon">📭</div>
-    <h3 class="empty-state__title">Пока нет загруженных фото</h3>
-    <p class="empty-state__text">Перетащите изображение в зону загрузки, чтобы начать</p>
-  </div>
+  <section class="error-screen" id="errorScreen">
+    <div class="error-center">
+      <span class="error__icon">🔗</span>
+      <h2 class="error__title">Ссылка недействительна</h2>
+      <p class="error__text" id="errorText">Альбом не найден или срок хранения истёк.</p>
+      <button class="btn btn--primary" id="goUploadBtn">Загрузить свой альбом</button>
+    </div>
+  </section>
 </main>
 
-<!-- ===== МОДАЛЬНОЕ ОКНО ПРОСМОТРА ===== -->
-<div class="modal" id="imageModal" role="dialog" aria-modal="true" aria-label="Просмотр изображения">
-  <div class="modal__overlay" id="modalOverlay"></div>
-  <div class="modal__content">
-    <button class="modal__close" id="modalClose" aria-label="Закрыть просмотр">&times;</button>
-    <img class="modal__image" id="modalImage" src="" alt="Полноразмерное изображение">
-  </div>
-</div>
-
-<!-- ===== КОНТЕЙНЕР ДЛЯ TOAST-УВЕДОМЛЕНИЙ ===== -->
-<div class="toast-container" id="toastContainer" aria-live="polite"></div>
-
-<!-- ===== ПОДКЛЮЧЕНИЕ ЛОГИКИ ===== -->
+<div class="toast-container" id="toastContainer"></div>
 <script src="script.js" defer></script>
 </body>
 </html>
