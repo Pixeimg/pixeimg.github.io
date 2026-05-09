@@ -1,8 +1,4 @@
-const SUPABASE_URL = 'https://api.pixeimg.ru';
-const SUPABASE_ANON_KEY = 'sb_publishable__YqXCFJaA6fHyVPHXzTKnw_OPih6Wa8';
-
-const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-if (!supabaseClient) throw new Error('Supabase SDK не загружен');
+const API_URL = 'https://api.pixeimg.ru';
 
 const uploadScreen = document.getElementById('uploadScreen');
 const viewScreen = document.getElementById('viewScreen');
@@ -41,11 +37,6 @@ function generateToken() {
     return 'xxxxxxxxxxxx'.replace(/x/g, () =>
         Math.floor(Math.random() * 16).toString(16)
     );
-}
-
-function getPublicUrl(fileName) {
-    const { data } = supabaseClient.storage.from('images').getPublicUrl(fileName);
-    return data?.publicUrl || '';
 }
 
 function showScreen(screen) {
@@ -88,16 +79,13 @@ function getOwnerToken() {
     return ownerToken;
 }
 
-function uploadFile(file, albumId, fileIndex) {
+function uploadFile(file) {
     return new Promise((resolve, reject) => {
-        const safeName = file.name.replace(/[^a-zA-Zа-яА-Я0-9._-]/g, '_');
-        const uniqueFileName = `${albumId}_${fileIndex}_${safeName}`;
-        const uploadUrl = `${SUPABASE_URL}/storage/v1/object/images/${uniqueFileName}`;
+        const fd = new FormData();
+        fd.append('file', file);
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', uploadUrl, true);
-        xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
-        xhr.setRequestHeader('Authorization', `Bearer ${SUPABASE_ANON_KEY}`);
+        xhr.open('POST', API_URL + '/upload', true);
 
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
@@ -109,19 +97,14 @@ function uploadFile(file, albumId, fileIndex) {
 
         xhr.addEventListener('load', () => {
             if (xhr.status >= 200 && xhr.status < 300) {
-                resolve({ fileName: uniqueFileName, publicUrl: getPublicUrl(uniqueFileName), originalName: file.name });
+                const data = JSON.parse(xhr.responseText);
+                resolve({ url: data.url, filename: data.filename, originalName: file.name });
             } else {
-                let msg = `Ошибка ${xhr.status}`;
-                try { msg = JSON.parse(xhr.responseText).message || msg; } catch (_) {}
-                reject(new Error(msg));
+                reject(new Error('Ошибка загрузки'));
             }
         });
 
         xhr.addEventListener('error', () => reject(new Error('Сетевая ошибка')));
-        xhr.addEventListener('abort', () => reject(new Error('Отменено')));
-
-        const fd = new FormData();
-        fd.append('file', file, uniqueFileName);
         xhr.send(fd);
     });
 }
@@ -149,11 +132,11 @@ async function handleFiles(files) {
         progressPct.textContent = '0%';
 
         try {
-            const result = await uploadFile(fileArray[i], albumId, i);
+            const result = await uploadFile(fileArray[i]);
             photos.push(result);
             uploaded++;
         } catch (err) {
-            showToast(`Ошибка: ${fileArray[i].name} — ${err.message}`, 'error');
+            showToast(`Ошибка: ${fileArray[i].name}`, 'error');
         }
     }
 
@@ -164,16 +147,18 @@ async function handleFiles(files) {
         return;
     }
 
-    const { error: dbError } = await supabaseClient
-        .from('albums')
-        .insert([{
-            album_id: albumId,
-            owner_token: ownerToken,
-            photos: photos,
-            created_at: new Date().toISOString()
-        }]);
-
-    if (dbError) {
+    try {
+        const resp = await fetch(API_URL + '/albums', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                album_id: albumId,
+                owner_token: ownerToken,
+                photos: photos
+            })
+        });
+        if (!resp.ok) throw new Error('Ошибка сохранения');
+    } catch (err) {
         showToast('Ошибка сохранения альбома', 'error');
         uploadZone.style.display = '';
         return;
@@ -192,38 +177,36 @@ async function handleFiles(files) {
 }
 
 async function loadAlbum(albumId, ownerParam) {
-    const { data, error } = await supabaseClient
-        .from('albums')
-        .select('*')
-        .eq('album_id', albumId)
-        .maybeSingle();
-
-    if (error || !data) {
+    let album;
+    try {
+        const resp = await fetch(API_URL + '/album/' + albumId);
+        if (!resp.ok) throw new Error('Not found');
+        album = await resp.json();
+    } catch (err) {
         showScreen(errorScreen);
         errorText.textContent = 'Альбом не найден или срок хранения истёк.';
         return;
     }
 
-    const age = Date.now() - new Date(data.created_at).getTime();
+    const createdAt = new Date(album.created_at).getTime();
+    const age = Date.now() - createdAt;
+
     if (age > MAX_AGE_MS) {
-        for (const photo of data.photos) {
-            await supabaseClient.storage.from('images').remove([photo.fileName]);
-        }
-        await supabaseClient.from('albums').delete().eq('album_id', albumId);
+        try { await fetch(API_URL + '/delete/' + albumId); } catch (_) {}
         showScreen(errorScreen);
         errorText.textContent = 'Срок хранения истёк (7 дней). Альбом удалён.';
         return;
     }
 
     const localOwner = localStorage.getItem('pixeimg_owner');
-    const isOwner = (ownerParam && ownerParam === data.owner_token) || (localOwner && localOwner === data.owner_token);
-    const photos = data.photos;
+    const isOwner = (ownerParam && ownerParam === album.owner_token) || (localOwner && localOwner === album.owner_token);
+    const photos = album.photos;
     const msLeft = MAX_AGE_MS - age;
     const { text: timeText, cssClass } = formatTimeLeft(msLeft);
 
     let gridHtml = '';
     photos.forEach((photo, idx) => {
-        gridHtml += `<img src="${photo.publicUrl}" alt="${photo.originalName}" class="album__thumb" data-index="${idx}" title="Кликните для просмотра">`;
+        gridHtml += `<img src="${photo.url}" alt="${photo.originalName}" class="album__thumb" data-index="${idx}" title="Кликните для просмотра">`;
     });
 
     viewContent.innerHTML = `
@@ -251,7 +234,7 @@ async function loadAlbum(albumId, ownerParam) {
         lb.className = 'lightbox active';
         lb.innerHTML = `
             <button class="lightbox__close">&times;</button>
-            <img src="${photos[currentIndex].publicUrl}" alt="" class="lightbox__image" id="lightboxImg">
+            <img src="${photos[currentIndex].url}" alt="" class="lightbox__image" id="lightboxImg">
             <span class="lightbox__counter">${currentIndex + 1} / ${photos.length}</span>
             <div class="lightbox__nav">
                 <button id="lbPrev">⬅ Назад</button>
@@ -261,7 +244,7 @@ async function loadAlbum(albumId, ownerParam) {
         document.body.appendChild(lb);
 
         const updateLb = () => {
-            document.getElementById('lightboxImg').src = photos[currentIndex].publicUrl;
+            document.getElementById('lightboxImg').src = photos[currentIndex].url;
             lb.querySelector('.lightbox__counter').textContent = `${currentIndex + 1} / ${photos.length}`;
         };
 
@@ -304,10 +287,7 @@ async function loadAlbum(albumId, ownerParam) {
 
     if (isOwner) {
         document.getElementById('deleteAlbumBtn').addEventListener('click', async () => {
-            for (const photo of photos) {
-                await supabaseClient.storage.from('images').remove([photo.fileName]);
-            }
-            await supabaseClient.from('albums').delete().eq('album_id', albumId);
+            try { await fetch(API_URL + '/delete/' + albumId); } catch (_) {}
             showToast('Альбом удалён', 'success');
             showScreen(errorScreen);
             errorText.textContent = 'Альбом удалён владельцем.';
@@ -315,7 +295,7 @@ async function loadAlbum(albumId, ownerParam) {
     }
 
     const timerInterval = setInterval(() => {
-        const remaining = MAX_AGE_MS - (Date.now() - new Date(data.created_at).getTime());
+        const remaining = MAX_AGE_MS - (Date.now() - createdAt);
         const timerEl = viewContent.querySelector('.album__timer');
         if (!timerEl) { clearInterval(timerInterval); return; }
         const { text, cssClass: cls } = formatTimeLeft(Math.max(0, remaining));
@@ -388,17 +368,16 @@ async function init() {
     }
 
     setInterval(async () => {
-        const { data: albums } = await supabaseClient.from('albums').select('*');
-        if (!albums) return;
-        const now = Date.now();
-        for (const album of albums) {
-            if (now - new Date(album.created_at).getTime() > MAX_AGE_MS) {
-                for (const photo of album.photos) {
-                    await supabaseClient.storage.from('images').remove([photo.fileName]);
+        try {
+            const resp = await fetch(API_URL + '/albums');
+            const albums = await resp.json();
+            const now = Date.now();
+            for (const album of albums) {
+                if (now - new Date(album.created_at).getTime() > MAX_AGE_MS) {
+                    await fetch(API_URL + '/delete/' + album.album_id);
                 }
-                await supabaseClient.from('albums').delete().eq('album_id', album.album_id);
             }
-        }
+        } catch (_) {}
     }, 30000);
 }
 
