@@ -426,3 +426,68 @@ body {
     .toast-container { left: 1rem; right: 1rem; }
     .result__actions { flex-direction: column; }
 }
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+}
+
+.auth-form__title {
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.auth-form__input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.7rem;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.auth-form__input:focus {
+    border-color: var(--accent);
+}
+
+.auth-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.auth-form__actions .btn {
+    flex: 1;
+}
+
+.my-albums__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.my-albums__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.8rem;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.my-albums__item span {
+    flex: 1;
+}

@@ -24,6 +24,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+let currentUser = null;
+
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
@@ -71,12 +73,29 @@ function validateFiles(files) {
 }
 
 function getOwnerToken() {
+    if (currentUser) return currentUser.owner_token;
     let ownerToken = localStorage.getItem('pixeimg_owner');
     if (!ownerToken) {
         ownerToken = generateToken();
         localStorage.setItem('pixeimg_owner', ownerToken);
     }
     return ownerToken;
+}
+
+function login(username, password) {
+    return fetch(API_URL + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    }).then(r => r.json());
+}
+
+function register(username, password) {
+    return fetch(API_URL + '/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    }).then(r => r.json());
 }
 
 function uploadFile(file) {
@@ -199,7 +218,9 @@ async function loadAlbum(albumId, ownerParam) {
     }
 
     const localOwner = localStorage.getItem('pixeimg_owner');
-    const isOwner = (ownerParam && ownerParam === album.owner_token) || (localOwner && localOwner === album.owner_token);
+    const isOwner = (ownerParam && ownerParam === album.owner_token) ||
+        (localOwner && localOwner === album.owner_token) ||
+        (currentUser && currentUser.owner_token === album.owner_token);
     const photos = album.photos;
     const msLeft = MAX_AGE_MS - age;
     const { text: timeText, cssClass } = formatTimeLeft(msLeft);
@@ -309,6 +330,56 @@ async function loadAlbum(albumId, ownerParam) {
     }, 1000);
 }
 
+async function loadMyAlbums() {
+    if (!currentUser) return;
+    try {
+        const resp = await fetch(API_URL + '/my-albums?token=' + currentUser.owner_token);
+        const albums = await resp.json();
+
+        let html = '<h2>📁 Мои альбомы</h2>';
+        if (albums.length === 0) {
+            html += '<p>У вас пока нет альбомов.</p>';
+        } else {
+            html += '<div class="my-albums__list">';
+            albums.forEach(album => {
+                const createdAt = new Date(album.created_at);
+                const date = createdAt.toLocaleDateString();
+                html += `
+                    <div class="my-albums__item">
+                        <span>🖼️ ${album.photos.length} фото — ${date}</span>
+                        <button class="btn btn--primary open-my-album" data-id="${album.album_id}">Открыть</button>
+                        <button class="btn btn--danger delete-my-album" data-id="${album.album_id}">Удалить</button>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        }
+        html += '<button class="btn btn--new" id="backToUploadBtn">⬅ К загрузке</button>';
+
+        viewContent.innerHTML = html;
+        showScreen(viewScreen);
+
+        document.querySelectorAll('.open-my-album').forEach(btn => {
+            btn.addEventListener('click', () => loadAlbum(btn.dataset.id, currentUser.owner_token));
+        });
+
+        document.querySelectorAll('.delete-my-album').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await fetch(API_URL + '/delete/' + btn.dataset.id);
+                showToast('Альбом удалён', 'success');
+                loadMyAlbums();
+            });
+        });
+
+        document.getElementById('backToUploadBtn').addEventListener('click', () => {
+            showScreen(uploadScreen);
+            uploadZone.style.display = '';
+        });
+    } catch (err) {
+        showToast('Ошибка загрузки альбомов', 'error');
+    }
+}
+
 uploadZone.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', () => {
@@ -356,6 +427,11 @@ goUploadBtn.addEventListener('click', () => {
 });
 
 async function init() {
+    const token = localStorage.getItem('pixeimg_user_token');
+    if (token) {
+        currentUser = { owner_token: token, username: localStorage.getItem('pixeimg_username') };
+    }
+
     const params = new URLSearchParams(window.location.search);
     const albumId = params.get('album');
     const owner = params.get('owner');
@@ -365,6 +441,44 @@ async function init() {
         await loadAlbum(albumId, owner);
     } else {
         showScreen(uploadScreen);
+    }
+
+    if (currentUser) {
+        const myAlbumsBtn = document.createElement('button');
+        myAlbumsBtn.className = 'btn';
+        myAlbumsBtn.textContent = '📁 Мои альбомы';
+        myAlbumsBtn.id = 'myAlbumsBtn';
+        myAlbumsBtn.style.position = 'fixed';
+        myAlbumsBtn.style.top = '1rem';
+        myAlbumsBtn.style.right = '1rem';
+        myAlbumsBtn.style.zIndex = '100';
+        myAlbumsBtn.addEventListener('click', loadMyAlbums);
+        document.body.appendChild(myAlbumsBtn);
+
+        const logoutBtn = document.createElement('button');
+        logoutBtn.className = 'btn btn--danger';
+        logoutBtn.textContent = '🚪 Выйти';
+        logoutBtn.style.position = 'fixed';
+        logoutBtn.style.top = '3.5rem';
+        logoutBtn.style.right = '1rem';
+        logoutBtn.style.zIndex = '100';
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('pixeimg_user_token');
+            localStorage.removeItem('pixeimg_username');
+            currentUser = null;
+            location.reload();
+        });
+        document.body.appendChild(logoutBtn);
+    } else {
+        const loginBtn = document.createElement('button');
+        loginBtn.className = 'btn';
+        loginBtn.textContent = '🔐 Войти';
+        loginBtn.style.position = 'fixed';
+        loginBtn.style.top = '1rem';
+        loginBtn.style.right = '1rem';
+        loginBtn.style.zIndex = '100';
+        loginBtn.addEventListener('click', showLoginForm);
+        document.body.appendChild(loginBtn);
     }
 
     setInterval(async () => {
@@ -379,6 +493,57 @@ async function init() {
             }
         } catch (_) {}
     }, 30000);
+}
+
+function showLoginForm() {
+    viewContent.innerHTML = `
+        <div class="auth-form">
+            <h2 class="auth-form__title">Вход / Регистрация</h2>
+            <input type="text" id="authUsername" class="auth-form__input" placeholder="Логин">
+            <input type="password" id="authPassword" class="auth-form__input" placeholder="Пароль">
+            <div class="auth-form__actions">
+                <button class="btn btn--primary" id="authLoginBtn">Войти</button>
+                <button class="btn" id="authRegisterBtn">Регистрация</button>
+                <button class="btn" id="authCancelBtn">Отмена</button>
+            </div>
+        </div>
+    `;
+    showScreen(viewScreen);
+
+    document.getElementById('authLoginBtn').addEventListener('click', async () => {
+        const username = document.getElementById('authUsername').value;
+        const password = document.getElementById('authPassword').value;
+        const result = await login(username, password);
+        if (result.error) {
+            showToast(result.error, 'error');
+        } else {
+            currentUser = result;
+            localStorage.setItem('pixeimg_user_token', result.owner_token);
+            localStorage.setItem('pixeimg_username', result.username);
+            showToast('Вход выполнен', 'success');
+            location.reload();
+        }
+    });
+
+    document.getElementById('authRegisterBtn').addEventListener('click', async () => {
+        const username = document.getElementById('authUsername').value;
+        const password = document.getElementById('authPassword').value;
+        const result = await register(username, password);
+        if (result.error) {
+            showToast(result.error, 'error');
+        } else {
+            currentUser = result;
+            localStorage.setItem('pixeimg_user_token', result.owner_token);
+            localStorage.setItem('pixeimg_username', username);
+            showToast('Регистрация успешна', 'success');
+            location.reload();
+        }
+    });
+
+    document.getElementById('authCancelBtn').addEventListener('click', () => {
+        showScreen(uploadScreen);
+        uploadZone.style.display = '';
+    });
 }
 
 document.addEventListener('DOMContentLoaded', init);
