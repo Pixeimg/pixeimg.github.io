@@ -1,4 +1,4 @@
-const SUPABASE_URL = 'http://api.pixeimg.ru';
+const SUPABASE_URL = 'https://api.pixeimg.ru';
 const SUPABASE_ANON_KEY = 'sb_publishable__YqXCFJaA6fHyVPHXzTKnw_OPih6Wa8';
 
 const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
