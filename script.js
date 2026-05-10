@@ -21,7 +21,7 @@ const goUploadBtn = document.getElementById('goUploadBtn');
 const toastCont = document.getElementById('toastContainer');
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/dng'];
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 let currentUser = null;
