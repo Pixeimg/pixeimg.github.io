@@ -20,7 +20,7 @@ const errorText = document.getElementById('errorText');
 const goUploadBtn = document.getElementById('goUploadBtn');
 const toastCont = document.getElementById('toastContainer');
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 30 МБ
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/dng'];
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
